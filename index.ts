@@ -75,11 +75,26 @@ const app = new Application({ adapter, botAppId: config.botId });
 
 //link unfurling
 const routeSelector: RouteSelector = async (context: TurnContext) => {
-  if (context.activity.value.url) return Promise.resolve(true)
+  if (context.activity.value.url && context.activity.name === 'composeExtension/queryLink') return Promise.resolve(true)
   else return Promise.resolve(false)
 };
 app.messageExtensions.queryLink(routeSelector, async (context: TurnContext, state: DefaultTurnState) => {
-  const attachment = CardFactory.thumbnailCard("Image Preview Card");
+  const card = {
+    "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+    "type": "AdaptiveCard",
+    "version": "1.5",
+    "body": [
+      {
+        "type": "TextBlock",
+        "text": "link unfurling",
+        "size": "large",
+        "wrap": true,
+        "style": "heading"
+      },
+    ]
+  }
+
+  const attachment = { ...CardFactory.adaptiveCard(card), preview: CardFactory.heroCard("test", "test") };
   return {
     type: "result",
     attachmentLayout: "list",
@@ -87,10 +102,28 @@ app.messageExtensions.queryLink(routeSelector, async (context: TurnContext, stat
   };
 })
 
-
 //zero install link unfurling
-app.messageExtensions.anonymousQueryLink(routeSelector, async (context: TurnContext, state: DefaultTurnState) => {
-  const attachment = CardFactory.thumbnailCard("zero install Card");
+const zeroInstallRouteSelector: RouteSelector = async (context: TurnContext) => {
+  if (context.activity.value.url && context.activity.name === 'composeExtension/anonymousQueryLink') return Promise.resolve(true)
+  else return Promise.resolve(false)
+};
+app.messageExtensions.anonymousQueryLink(zeroInstallRouteSelector, async (context: TurnContext, state: DefaultTurnState) => {
+  const card = {
+    "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+    "type": "AdaptiveCard",
+    "version": "1.5",
+    "body": [
+      {
+        "type": "TextBlock",
+        "text": "zero install link unfurling",
+        "size": "large",
+        "wrap": true,
+        "style": "heading"
+      },
+    ]
+  }
+
+  const attachment = { ...CardFactory.adaptiveCard(card), preview: CardFactory.heroCard("test", "test") };
   return {
     type: "result",
     attachmentLayout: "list",
@@ -101,7 +134,7 @@ app.messageExtensions.anonymousQueryLink(routeSelector, async (context: TurnCont
 
 //search
 app.messageExtensions.query("searchQuery", async (context: TurnContext, state: DefaultTurnState, query: any) => {
-  const searchQuery = 'test';
+  const searchQuery = query.parameters.searchQuery;
   const response = await axios.get(
     `http://registry.npmjs.com/-/v1/search?${querystring.stringify({
       text: searchQuery,
