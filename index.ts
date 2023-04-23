@@ -3,18 +3,27 @@ import * as restify from "restify";
 
 // Import required bot services.
 // See https://aka.ms/bot-services to learn more about the different parts of a bot.
-import { BotFrameworkAdapter, TurnContext } from "botbuilder";
+import { CardFactory, CloudAdapter, ConfigurationBotFrameworkAuthentication, ConfigurationServiceClientCredentialFactory, TurnContext } from "botbuilder";
 
 // This bot's main dialog.
-import { TeamsBot } from "./teamsBot";
 import config from "./config";
+import { default as axios } from "axios";
+import * as querystring from "querystring";
 
 // Create adapter.
 // See https://aka.ms/about-bot-adapter to learn more about adapters.
-const adapter = new BotFrameworkAdapter({
-  appId: config.botId,
-  appPassword: config.botPassword,
+const credentialsFactory = new ConfigurationServiceClientCredentialFactory({
+  MicrosoftAppId: config.botId,
+  MicrosoftAppPassword: config.botPassword,
+  MicrosoftAppType: "MultiTenant",
 });
+
+const botFrameworkAuthentication = new ConfigurationBotFrameworkAuthentication(
+  {},
+  credentialsFactory
+);
+
+const adapter = new CloudAdapter(botFrameworkAuthentication);
 
 // Catch-all for errors.
 const onTurnErrorHandler = async (context: TurnContext, error: Error) => {
@@ -40,17 +49,106 @@ const onTurnErrorHandler = async (context: TurnContext, error: Error) => {
 adapter.onTurnError = onTurnErrorHandler;
 
 // Create the bot that will handle incoming messages.
-const bot = new TeamsBot();
+// const bot = new TeamsBot();
 
 // Create HTTP server.
 const server = restify.createServer();
+server.use(restify.plugins.bodyParser());
 server.listen(process.env.port || process.env.PORT || 3978, () => {
   console.log(`\nBot Started, ${server.name} listening to ${server.url}`);
 });
 
+
+
+import {
+  Application,
+  DefaultConversationState,
+  DefaultPromptManager,
+  DefaultTempState,
+  DefaultTurnState,
+  DefaultUserState,
+  OpenAIPlanner,
+  RouteSelector
+} from '@microsoft/botbuilder-m365';
+
+const app = new Application({ adapter, botAppId: config.botId });
+
+//link unfurling
+const routeSelector: RouteSelector = async (context: TurnContext) => {
+  if (context.activity.value.url) return Promise.resolve(true)
+  else return Promise.resolve(false)
+};
+// app.messageExtensions.queryLink(routeSelector, async (context: TurnContext, state: DefaultTurnState) => {
+//   const attachment = CardFactory.thumbnailCard("Image Preview Card");
+//   return {
+//     type: "result",
+//     attachmentLayout: "list",
+//     attachments: [attachment],
+//   };
+// })
+
+
+//zero install link unfurling
+app.messageExtensions.anonymousQueryLink(routeSelector, async (context: TurnContext, state: DefaultTurnState) => {
+  const attachment = CardFactory.thumbnailCard("zero install Card");
+  return {
+    type: "result",
+    attachmentLayout: "list",
+    attachments: [attachment],
+  };
+})
+
+
+//search
+app.messageExtensions.query("searchQuery", async (context: TurnContext, state: DefaultTurnState, query: any) => {
+  const searchQuery = 'test';
+  const response = await axios.get(
+    `http://registry.npmjs.com/-/v1/search?${querystring.stringify({
+      text: searchQuery,
+      size: 8,
+    })}`
+  );
+
+  const attachments = [];
+  response.data.objects.forEach((obj) => {
+    const heroCard = CardFactory.heroCard(obj.package.name);
+    const preview = CardFactory.heroCard(obj.package.name);
+    preview.content.tap = {
+      type: "invoke",
+      value: { name: obj.package.name, description: obj.package.description },
+    };
+    const attachment = { ...heroCard, preview };
+    attachments.push(attachment);
+  });
+  return {
+    type: "result",
+    attachmentLayout: "list",
+    attachments: attachments,
+  }
+});
+
+
+//action
+app.messageExtensions.submitAction("createCard", async (context: TurnContext, state: DefaultTurnState, action: any) => {
+  const data = action;
+  const heroCard = CardFactory.heroCard(data.title, data.text);
+  heroCard.content.subtitle = data.subTitle;
+  const attachment = {
+    contentType: heroCard.contentType,
+    content: heroCard.content,
+    preview: heroCard,
+  };
+
+  return {
+    type: "result",
+    attachmentLayout: "list",
+    attachments: [attachment],
+  };
+});
+
 // Listen for incoming requests.
 server.post("/api/messages", async (req, res) => {
-  await adapter.processActivity(req, res, async (context) => {
-    await bot.run(context);
+  await adapter.process(req, res, async (context) => {
+    await app.run(context);
   });
 });
