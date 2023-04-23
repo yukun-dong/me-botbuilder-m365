@@ -78,14 +78,14 @@ const routeSelector: RouteSelector = async (context: TurnContext) => {
   if (context.activity.value.url) return Promise.resolve(true)
   else return Promise.resolve(false)
 };
-// app.messageExtensions.queryLink(routeSelector, async (context: TurnContext, state: DefaultTurnState) => {
-//   const attachment = CardFactory.thumbnailCard("Image Preview Card");
-//   return {
-//     type: "result",
-//     attachmentLayout: "list",
-//     attachments: [attachment],
-//   };
-// })
+app.messageExtensions.queryLink(routeSelector, async (context: TurnContext, state: DefaultTurnState) => {
+  const attachment = CardFactory.thumbnailCard("Image Preview Card");
+  return {
+    type: "result",
+    attachmentLayout: "list",
+    attachments: [attachment],
+  };
+})
 
 
 //zero install link unfurling
