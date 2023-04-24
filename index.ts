@@ -160,6 +160,22 @@ app.messageExtensions.query("searchQuery", async (context: TurnContext, state: D
   }
 });
 
+app.messageExtensions.selectItem( async (context: TurnContext, state: DefaultTurnState, item: any) => {
+  const data = item;
+  const heroCard = CardFactory.heroCard(data.name, data.description);
+  const attachment = {
+    contentType: heroCard.contentType,
+    content: heroCard.content,
+    preview: heroCard,
+  };
+
+  return {
+    type: "result",
+    attachmentLayout: "list",
+    attachments: [attachment],
+  };
+});
+
 
 //action
 app.messageExtensions.submitAction("createCard", async (context: TurnContext, state: DefaultTurnState, action: any) => {
